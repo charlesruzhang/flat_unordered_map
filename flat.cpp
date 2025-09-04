@@ -7,10 +7,10 @@ static const int INVCOUNT = 1e4;
 static constexpr double CPU_FREQ_HZ = 3201000000.0; // CHANGE THIS TO THE REAL FREQUENCY.
 static constexpr double CYCLES_TO_NS = 1e9 / CPU_FREQ_HZ;
 static inline uint64_t ticks() { _mm_lfence(); auto t=__rdtsc(); _mm_lfence(); return t; }
+const std::array<int, 2> seed_prime = {9973, 10007};
 struct smallstring {
     uint64_t hash;
     uint64_t sz; 
-    const std::array<int, 2> seed_prime = {9973, 10007};
     std::string s;
     smallstring(const std::string& symbol) {
         sz = symbol.size();
@@ -26,6 +26,11 @@ struct smallstring {
         hashval[1] ^= (hashval[1] >> 27);
         hash = hashval[0] * 0xbf58476d1ce4e5b9ULL + hashval[1];
     }
+    smallstring() {
+        sz = 0;
+        s = "";
+        hash = 0;
+    }
 };
 struct smallstringHash {
     size_t operator()(const smallstring& k) const noexcept {
@@ -39,24 +44,39 @@ struct smallstringEq {
 };
 template <typename K, typename V, typename Hash = std::hash<K>, typename Eq = std::equal_to<K>>
 struct flat_map {
-    std::vector<std::vector<std::pair<K, V>>> memory;
+    std::vector<std::pair<K, V>> memory;
     Hash hasher;
     Eq eqer;
     uint64_t mask;
+    std::vector<uint64_t> pref;
     flat_map (std::vector<std::pair<K, V>>& elements) {
         uint64_t N = elements.size();
         int bit_length = std::bit_width(N);
-        memory.resize(1ll << bit_length);
         mask = (1ll << bit_length) - 1;
-        for (auto [k, v] : elements) {
+        std::vector<int> cnt(mask+1);
+        pref.resize(mask+2);
+        pref[0] = 0;
+        for (auto& [k, v] : elements) {
             uint64_t index = hasher(k) & mask;
-            memory[index].push_back({k, v});
+            cnt[index]++;
+        }
+        for (int i = 0; i <= mask; i++) {
+            pref[i+1] = pref[i] + cnt[i];
+            cnt[i] = 0;
+        }
+        pref[mask+1] = N;
+        memory.resize(N);
+        for (auto& [k, v] : elements) {
+            uint64_t index = hasher(k) & mask;
+            memory[pref[index] + cnt[index]] = {k, v};
+            cnt[index]++;
         }
     }
 
     V find (const K& key) {
         uint64_t index = hasher(key) & mask;
-        for (auto& [k, v] : memory[index]) {
+        for (int i = pref[index]; i < pref[index+1]; i++) {
+            auto& [k, v] = memory[i];
             if (eqer(key, k)) {
                 return v;
             }
@@ -154,7 +174,7 @@ void time_it (std::vector<uint64_t>& times) {
 int test_time(std::vector<std::pair<smallstring, int>>& elements, std::vector<smallstring>& bad_keys) {
     std::mt19937 rng(std::chrono::steady_clock::now().time_since_epoch().count());
 
-    std::cout << "Test Start!" << std::endl;
+    std::cout << "Test Time Start!" << std::endl;
     flat_map<smallstring, int, smallstringHash, smallstringEq> fmap(elements);
     bool fail = 0;
     std::vector<int> valid_tests(TCOUNT);
