@@ -6,7 +6,7 @@
 #include "smallstring.hpp"
 //Main Assumption here is that we are not adding elements at run time to the map.
 template <typename K, typename V, typename Hash = std::hash<K>, typename Eq = std::equal_to<K>>
-class flat_map {
+class alignas(64) flat_map {
     private:
         uint64_t mask;
         std::vector<std::pair<K, V>> memory;

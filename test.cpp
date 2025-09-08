@@ -215,7 +215,7 @@ int main(int argc, char* argv[]) {
                   << " <tcount> <maxx> <invcount> <output_file>\n";
         return 1;
     }
-
+    static_assert(sizeof(smallstring) == 16);
     size_t tcount   = std::stoull(argv[1]);
     size_t maxx     = std::stoull(argv[2]);
     size_t invcount = std::stoull(argv[3]);
