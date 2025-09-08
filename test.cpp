@@ -116,9 +116,10 @@ class test_flat_map {
         void time_it(std::vector<uint64_t>& times) {
             std::sort(times.begin(), times.end());
             size_t times_size = times.size();
-            std::function <size_t(int)> getKth = [times_size] (int K) {
-                return times_size / 100 * K - 1;
+            auto getKth = [&times](int K)->size_t {
+                return std::min(times.size()-1, (K * (times.size()-1) + 50) / 100);
             };
+
             size_t p50 = getKth(50);
             size_t p75 = getKth(75);
             size_t p99 = getKth(99);
